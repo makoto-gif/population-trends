@@ -161,8 +161,24 @@
     chartGeom = PopChart.drawChart(c.ctx, { x: 0, y: 0, w: c.w, h: c.h }, chartSpec(false));
   }
 
+  /** スライド枠を、はみ出さない側の辺に合わせて16:9の実寸で置く。 */
+  function layoutSlideStage() {
+    var stage = $('.slidestage'), wrap = $('.slidewrap');
+    if (!stage || !wrap) return;
+    if (getComputedStyle(stage).display === 'block') {   // 折り返しレイアウトでは CSS に任せる
+      wrap.style.width = '';
+      wrap.style.height = '';
+      return;
+    }
+    var r = stage.getBoundingClientRect();
+    var w = Math.floor(Math.min(r.width, r.height * 16 / 9));
+    wrap.style.width = w + 'px';
+    wrap.style.height = Math.floor(w * 9 / 16) + 'px';
+  }
+
   function renderSlide() {
     if (state.view !== 'slide') return;
+    layoutSlideStage();
     var c = sizeCanvas($('#slide'));
     if (!c) return;
     PopChart.drawSlide(c.ctx, c.w, c.h, slideSpec());
@@ -224,7 +240,8 @@
     var rows = ds.rankingAt(year, state.rankN);
     var max = rows.length ? rows[0].value : 1;
     var list = $('#ranking');
-    var rowH = 30;
+    var rowH = parseInt(getComputedStyle(document.documentElement)
+      .getPropertyValue('--rank-row'), 10) || 28;
     var colorOf = {};
     series.forEach(function (se) { colorOf[se.id] = se.color; });
 

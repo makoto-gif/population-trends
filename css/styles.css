@@ -18,9 +18,22 @@
 
   --radius: 10px;
   --shadow: 0 1px 2px rgba(34,23,20,.06), 0 6px 20px rgba(34,23,20,.05);
+
+  /* ランキング1行の高さ。JS 側もこの値を読んで行を配置する */
+  --rank-row: 26px;
 }
 
 * { box-sizing: border-box; }
+
+html { height: 100%; }
+
+body {
+  /* 画面の高さに収める。縦に足りないときだけスクロールに切り替える */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 
 html, body {
   margin: 0;
@@ -38,7 +51,7 @@ button, input, select { font: inherit; color: inherit; }
 /* ---------- ヘッダー ---------- */
 .appbar {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 16px; padding: 12px 20px;
+  gap: 16px; padding: 9px 18px;
   background: var(--gg-black); color: #fff;
 }
 .appbar__title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700; letter-spacing: .02em; }
@@ -49,39 +62,47 @@ button, input, select { font: inherit; color: inherit; }
 }
 
 /* ---------- タブ ---------- */
-.tabs { display: flex; gap: 4px; padding: 10px 20px 0; background: var(--gg-black); }
+.tabs { display: flex; gap: 4px; padding: 8px 18px 0; background: var(--gg-black); }
 .tab {
   border: 0; background: rgba(255,255,255,.10); color: #E9E5E4;
-  padding: 9px 20px; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 600;
+  padding: 7px 20px; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 600;
 }
 .tab:hover { background: rgba(255,255,255,.18); }
 .tab.is-active { background: var(--gg-bg); color: var(--ink); }
 
 /* ---------- レイアウト ---------- */
+.appbar, .tabs { flex: none; }
+
 .layout {
+  flex: 1; min-height: 0;
   display: grid; grid-template-columns: 288px minmax(0, 1fr);
-  gap: 20px; padding: 20px; align-items: start;
+  gap: 16px; padding: 16px;
 }
-@media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
 
 .panel {
   background: var(--surface); border: 1px solid var(--gg-border);
   border-radius: var(--radius); box-shadow: var(--shadow);
-  padding: 18px; position: sticky; top: 20px;
-  max-height: calc(100vh - 40px); overflow-y: auto;
+  padding: 18px; min-height: 0; overflow-y: auto;
 }
-.main { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 
 .view { display: none; }
-.view.is-active { display: flex; flex-direction: column; gap: 20px; }
+.view.is-active { display: flex; flex-direction: column; gap: 16px; height: 100%; min-height: 0; }
 
 .card {
   background: var(--surface); border: 1px solid var(--gg-border);
-  border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 20px 20px;
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 18px 16px;
+  display: flex; flex-direction: column; min-height: 0;
 }
+/* グラフを主役に、ランキングは残りの高さに収める */
+.card--chart { flex: 1 1 56%; min-height: 260px; }
+.card--rank  { flex: 1 1 44%; }
+.card--slide { flex: 1 1 auto; }
+
 .card__head {
+  flex: none;
   display: flex; align-items: center; justify-content: space-between;
-  gap: 16px; flex-wrap: wrap; margin-bottom: 12px;
+  gap: 16px; flex-wrap: wrap; margin-bottom: 10px;
 }
 .card__title { margin: 0; font-size: 15px; font-weight: 700; }
 .card__sub { margin-left: 10px; font-weight: 500; color: var(--ink-2); font-size: 13px; }
@@ -160,9 +181,21 @@ select:focus, input:focus { outline: 2px solid var(--gg-red); outline-offset: 1p
 .player__year { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; min-width: 96px; text-align: right; }
 
 /* ---------- グラフ ---------- */
-.chartwrap { position: relative; width: 100%; aspect-ratio: 16 / 8; }
+.chartwrap { position: relative; flex: 1; min-height: 0; width: 100%; }
 .chartwrap canvas { width: 100%; height: 100%; display: block; }
-.slidewrap { position: relative; width: 100%; aspect-ratio: 16 / 9; border: 1px solid var(--gg-border); border-radius: 8px; overflow: hidden; }
+
+/* スライドは16:9を保ったまま、はみ出さない側の辺に合わせて縮める */
+.slidestage {
+  flex: 1; min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+/* 幅・高さは JS（layoutSlideStage）が実寸で入れる。以下は折り返しレイアウト時の値 */
+.slidewrap {
+  position: relative; width: 100%; aspect-ratio: 16 / 9;
+  border-radius: 8px; overflow: hidden;
+  /* border ではなく outline。枠線が箱のサイズに影響せず、16:9が正確に保たれる */
+  outline: 1px solid var(--gg-border); outline-offset: -1px;
+}
 .slidewrap canvas { width: 100%; height: 100%; display: block; }
 
 .tooltip {
@@ -188,9 +221,10 @@ select:focus, input:focus { outline: 2px solid var(--gg-red); outline-offset: 1p
 .rank-ctl { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-2); }
 .rank-ctl select { width: auto; padding: 5px 8px; }
 
+.ranking-scroll { flex: 1; min-height: 0; overflow-y: auto; padding-right: 2px; }
 .ranking { list-style: none; margin: 0; padding: 0; position: relative; transition: height .32s ease; }
 .ranking li {
-  position: absolute; left: 0; right: 0; top: 0; height: 30px;
+  position: absolute; left: 0; right: 0; top: 0; height: var(--rank-row);
   display: grid; grid-template-columns: 30px minmax(96px, 168px) 1fr auto;
   align-items: center; gap: 12px;
   transition: transform .32s ease;
@@ -206,4 +240,19 @@ select:focus, input:focus { outline: 2px solid var(--gg-red); outline-offset: 1p
   position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
   background: var(--gg-black); color: #fff; padding: 11px 22px; border-radius: 999px;
   font-size: 13px; box-shadow: 0 8px 28px rgba(0,0,0,.26); z-index: 50;
+}
+
+/* カード内の補足テキストは高さを取り合わない */
+.card > .field__note { flex: none; }
+
+/* 画面が狭い・低いときは1画面に押し込めないので、素直にスクロールさせる */
+@media (max-width: 900px), (max-height: 620px) {
+  body { height: auto; overflow: auto; }
+  .layout { grid-template-columns: 1fr; height: auto; }
+  .panel { overflow: visible; }
+  .view.is-active { height: auto; }
+  .card--chart, .card--rank, .card--slide { flex: none; }
+  .chartwrap { flex: none; aspect-ratio: 16 / 8; }
+  .slidestage { flex: none; display: block; }
+  .ranking-scroll { overflow: visible; }
 }

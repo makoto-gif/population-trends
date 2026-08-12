@@ -121,7 +121,7 @@
   <main class="main">
 
     <section class="view is-active" data-view="explore">
-      <div class="card">
+      <div class="card card--chart">
         <div class="card__head">
           <h2 class="card__title" id="chartTitle">人口の推移</h2>
           <div class="player">
@@ -137,7 +137,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card card--rank">
         <div class="card__head">
           <h2 class="card__title">ランキング<span class="card__sub" id="rankYear"></span></h2>
           <div class="rank-ctl">
@@ -149,12 +149,14 @@
             </select>
           </div>
         </div>
-        <ol class="ranking" id="ranking"></ol>
+        <div class="ranking-scroll">
+          <ol class="ranking" id="ranking"></ol>
+        </div>
       </div>
     </section>
 
     <section class="view" data-view="slide">
-      <div class="card">
+      <div class="card card--slide">
         <div class="card__head">
           <h2 class="card__title">スライドのプレビュー</h2>
           <div class="player">
@@ -162,7 +164,9 @@
             <output class="player__year" id="timeLabel2">—</output>
           </div>
         </div>
-        <div class="slidewrap"><canvas id="slide"></canvas></div>
+        <div class="slidestage">
+          <div class="slidewrap"><canvas id="slide"></canvas></div>
+        </div>
         <p class="field__note" style="margin-top:12px">
           16:9（1920×1080px）で書き出します。左のパネルで変えた内容がそのまま反映されます。
         </p>
