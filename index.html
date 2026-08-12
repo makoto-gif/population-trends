@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>人口推移ビューア｜世界と日本の人口の歩みとこれから</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="appbar">
+  <div class="appbar__title">
+    <span class="appbar__mark"></span>
+    人口推移ビューア
+  </div>
+  <div class="appbar__meta" id="dataStamp">データ読み込み中…</div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button class="tab is-active" role="tab" data-view="explore">推移を見る</button>
+  <button class="tab" role="tab" data-view="slide">スライド作成</button>
+</nav>
+
+<div class="layout">
+
+  <!-- ============ 左パネル ============ -->
+  <aside class="panel">
+
+    <div class="field">
+      <label class="field__label">対象</label>
+      <div class="segmented" data-control="mode">
+        <button class="is-active" data-value="world">世界（国・地域）</button>
+        <button data-value="japan">日本（都道府県）</button>
+      </div>
+      <p class="field__note" id="modeNote"></p>
+    </div>
+
+    <div class="field">
+      <label class="field__label">表示するもの</label>
+      <div class="segmented" data-control="pick">
+        <button class="is-active" data-value="top">人口の多い順</button>
+        <button data-value="manual">自分で選ぶ</button>
+      </div>
+    </div>
+
+    <div class="field" data-when="pick=top">
+      <label class="field__label" for="topN">グラフに出す数</label>
+      <select id="topN">
+        <option value="3">3</option>
+        <option value="5" selected>5（基本）</option>
+        <option value="8">8（最大）</option>
+      </select>
+      <p class="field__note">順位は下のランキングで20位まで見られます。線が読み取れる上限が8本です。</p>
+    </div>
+
+    <div class="field" data-when="pick=top">
+      <label class="field__label" for="rankAtYear">順位を決める年</label>
+      <select id="rankAtYear"></select>
+      <p class="field__note">この年の人口が多い順に選ばれます。</p>
+    </div>
+
+    <div class="field" data-when="pick=manual">
+      <label class="field__label">比較したい国・地域（最大8）</label>
+      <input type="search" id="entitySearch" placeholder="名前で絞り込む" autocomplete="off">
+      <div class="picker" id="entityPicker"></div>
+      <div class="picker__actions">
+        <span id="pickCount">0 / 8</span>
+        <button class="linkbtn" id="clearPick">すべて外す</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field__label">期間</label>
+      <div class="row">
+        <select id="yearFrom"></select>
+        <span class="row__sep">〜</span>
+        <select id="yearTo"></select>
+      </div>
+      <div class="chips" id="periodPresets"></div>
+    </div>
+
+    <div class="field">
+      <label class="field__label">見せ方</label>
+      <div class="segmented segmented--stack" data-control="metric">
+        <button class="is-active" data-value="abs">人口そのもの</button>
+        <button data-value="index">起点の年＝100 の指数</button>
+        <button data-value="share">全体に占める割合</button>
+      </div>
+      <p class="field__note" id="metricNote"></p>
+    </div>
+
+    <div class="field">
+      <label class="field__label">未来ゾーン</label>
+      <label class="check"><input type="checkbox" id="showFuture" checked> 将来推計を表示する</label>
+      <label class="check"><input type="checkbox" id="showCallout" checked> キャッチ文言を入れる</label>
+      <input type="text" id="calloutText" value="この先、どこが伸びるか">
+    </div>
+
+    <div class="field" data-view="slide">
+      <label class="field__label" for="slideTitle">スライドのタイトル</label>
+      <input type="text" id="slideTitle" placeholder="（自動）">
+      <label class="field__label" for="slideSubtitle" style="margin-top:10px">サブタイトル</label>
+      <input type="text" id="slideSubtitle" placeholder="（自動）">
+    </div>
+
+    <div class="field" data-view="slide">
+      <label class="field__label">ダウンロード</label>
+      <button class="btn btn--primary" id="dlPng">PNG（スライド画像）</button>
+      <button class="btn" id="dlPptx">PowerPoint（.pptx）</button>
+      <p class="field__note">PowerPoint は「表紙・グラフ・ランキング・出典」の4枚で出力されます。</p>
+    </div>
+
+    <div class="field field--source">
+      <label class="field__label">このグラフの出典</label>
+      <ul class="sources" id="sourceList"></ul>
+    </div>
+
+  </aside>
+
+  <!-- ============ メイン ============ -->
+  <main class="main">
+
+    <section class="view is-active" data-view="explore">
+      <div class="card">
+        <div class="card__head">
+          <h2 class="card__title" id="chartTitle">人口の推移</h2>
+          <div class="player">
+            <button class="btn btn--play" id="playBtn" aria-label="再生">▶ 再生</button>
+            <input type="range" id="timeline" min="0" max="100" value="100">
+            <output class="player__year" id="timeLabel">—</output>
+          </div>
+        </div>
+        <div class="chartwrap">
+          <canvas id="chart"></canvas>
+          <div class="tooltip" id="tooltip" hidden></div>
+          <div class="event" id="eventBanner" hidden></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head">
+          <h2 class="card__title">ランキング<span class="card__sub" id="rankYear"></span></h2>
+          <div class="rank-ctl">
+            <label for="rankN">表示</label>
+            <select id="rankN">
+              <option value="10" selected>10位まで</option>
+              <option value="20">20位まで</option>
+              <option value="5">5位まで</option>
+            </select>
+          </div>
+        </div>
+        <ol class="ranking" id="ranking"></ol>
+      </div>
+    </section>
+
+    <section class="view" data-view="slide">
+      <div class="card">
+        <div class="card__head">
+          <h2 class="card__title">スライドのプレビュー</h2>
+          <div class="player">
+            <input type="range" id="timeline2" min="0" max="100" value="100">
+            <output class="player__year" id="timeLabel2">—</output>
+          </div>
+        </div>
+        <div class="slidewrap"><canvas id="slide"></canvas></div>
+        <p class="field__note" style="margin-top:12px">
+          16:9（1920×1080px）で書き出します。左のパネルで変えた内容がそのまま反映されます。
+        </p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="vendor/pptxgen.bundle.js"></script>
+<script src="js/data.js"></script>
+<script src="js/chart.js"></script>
+<script src="js/export.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# 元データ（tools/fetch_raw.sh で取得し直せるためコミットしない）
+tools/raw/
+
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# 書き出したファイル
+*.pptx
+*.png
+!assets/**/*.png
