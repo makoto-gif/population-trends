@@ -5,6 +5,13 @@
 
 時価総額ランキングのビューアと同じ操作感で、扱う対象を「人口」に置き換えたもの。
 
+## 公開URL
+
+- **https://population-trends-ruby.vercel.app/** （Vercel・本番）
+- https://makoto-gif.github.io/population-trends/ （GitHub Pages・予備）
+
+どちらもログイン不要で誰でも使える。`main` に push すると Vercel が自動で再デプロイする。
+
 ---
 
 ## できること
