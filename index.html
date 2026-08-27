@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>人口推移ビューア｜世界と日本の人口の歩みとこれから</title>
-<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/styles.css?v=5">
 </head>
 <body>
 
@@ -18,6 +18,7 @@
 
 <nav class="tabs" role="tablist">
   <button class="tab is-active" role="tab" data-view="explore">推移を見る</button>
+  <button class="tab" role="tab" data-view="map">世界地図</button>
   <button class="tab" role="tab" data-view="slide">スライド作成</button>
 </nav>
 
@@ -96,6 +97,20 @@
       <input type="text" id="calloutText" value="この先、どこが伸びるか">
     </div>
 
+    <div class="field" data-view="map">
+      <label class="field__label">地図の見せ方</label>
+      <div class="segmented segmented--stack" data-control="mapMode">
+        <button class="is-active" data-value="abs">その年の人口</button>
+        <button data-value="ratio">起点の年からの倍率</button>
+      </div>
+      <p class="field__note" id="mapModeNote"></p>
+    </div>
+
+    <div class="field" data-view="map">
+      <label class="field__label">ダウンロード</label>
+      <button class="btn btn--primary" id="dlMapPng">PNG（地図のスライド画像）</button>
+    </div>
+
     <div class="field" data-view="slide">
       <label class="field__label" for="slideTitle">スライドのタイトル</label>
       <input type="text" id="slideTitle" placeholder="（自動）">
@@ -107,7 +122,7 @@
       <label class="field__label">ダウンロード</label>
       <button class="btn btn--primary" id="dlPng">PNG（スライド画像）</button>
       <button class="btn" id="dlPptx">PowerPoint（.pptx）</button>
-      <p class="field__note">PowerPoint は「表紙・グラフ・ランキング・出典」の4枚で出力されます。</p>
+      <p class="field__note" id="pptxNote">PowerPoint は「表紙・グラフ・ランキング・出典」の4枚で出力されます。</p>
     </div>
 
     <div class="field field--source">
@@ -125,9 +140,9 @@
         <div class="card__head">
           <h2 class="card__title" id="chartTitle">人口の推移</h2>
           <div class="player">
-            <button class="btn btn--play" id="playBtn" aria-label="再生">▶ 再生</button>
-            <input type="range" id="timeline" min="0" max="100" value="100">
-            <output class="player__year" id="timeLabel">—</output>
+            <button class="btn btn--play js-play" aria-label="再生">▶ 再生</button>
+            <input type="range" class="js-timeline" min="0" max="100" value="100">
+            <output class="player__year js-timelabel">—</output>
           </div>
         </div>
         <div class="chartwrap">
@@ -155,13 +170,35 @@
       </div>
     </section>
 
+    <section class="view" data-view="map">
+      <div class="card card--map">
+        <div class="card__head">
+          <h2 class="card__title" id="mapTitle">世界地図で見る人口</h2>
+          <div class="player">
+            <button class="btn btn--play js-play" aria-label="再生">▶ 再生</button>
+            <input type="range" class="js-timeline" min="0" max="100" value="100">
+            <output class="player__year js-timelabel">—</output>
+          </div>
+        </div>
+        <div class="mapwrap">
+          <canvas id="map"></canvas>
+          <div class="tooltip" id="mapTooltip" hidden></div>
+          <div class="notice" id="mapNotice" hidden>
+            世界地図は「対象: 世界（国・地域）」のときに使えます。
+            都道府県の地図は今のところありません。
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="view" data-view="slide">
       <div class="card card--slide">
         <div class="card__head">
           <h2 class="card__title">スライドのプレビュー</h2>
           <div class="player">
-            <input type="range" id="timeline2" min="0" max="100" value="100">
-            <output class="player__year" id="timeLabel2">—</output>
+            <button class="btn btn--play js-play" aria-label="再生">▶ 再生</button>
+            <input type="range" class="js-timeline" min="0" max="100" value="100">
+            <output class="player__year js-timelabel">—</output>
           </div>
         </div>
         <div class="slidestage">
@@ -178,10 +215,11 @@
 
 <div class="toast" id="toast" hidden></div>
 
-<script src="vendor/pptxgen.bundle.js"></script>
-<script src="js/data.js"></script>
-<script src="js/chart.js"></script>
-<script src="js/export.js"></script>
-<script src="js/app.js"></script>
+<script src="vendor/pptxgen.bundle.js?v=5"></script>
+<script src="js/data.js?v=5"></script>
+<script src="js/chart.js?v=5"></script>
+<script src="js/map.js?v=5"></script>
+<script src="js/export.js?v=5"></script>
+<script src="js/app.js?v=5"></script>
 </body>
 </html>

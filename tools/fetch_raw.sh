@@ -19,5 +19,9 @@ echo "▶ 日本 都道府県 2020–2050（国立社会保障・人口問題研
 curl -sSL -A "$UA" -o "$DEST/kekkahyo1.xlsx" \
   "https://www.ipss.go.jp/pp-shicyoson/j/shicyoson23/2gaiyo_hyo/kekkahyo1.xlsx"
 
+echo "▶ 世界地図の国境（Natural Earth 110m・パブリックドメイン）"
+curl -sSL -o "$DEST/ne110m.geojson" \
+  "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson"
+
 echo "✔ 取得完了: $DEST"
 echo "  次に: python3 tools/build_data.py --raw \"$DEST\""

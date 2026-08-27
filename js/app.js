@@ -29,10 +29,13 @@
     rankAtYear: null, manualIds: [], yearFrom: 1800, yearTo: 2100,
     metric: 'abs', showFuture: true, showCallout: true,
     calloutText: DEFAULTS.world.callout, currentYear: 2100,
-    rankN: 10, slideTitle: '', slideSubtitle: '', playing: false
+    rankN: 10, slideTitle: '', slideSubtitle: '', playing: false,
+    mapMode: 'abs', hoverId: null
   };
 
   var ds = null;               // 現在の Dataset
+  var geo = null;              // 世界地図のポリゴン（世界モードで初回表示時に読み込む）
+  var mapGeom = null;          // 地図の当たり判定用ジオメトリ
   var cache = {};              // モードごとのキャッシュ
   var series = [];             // 描画中の系列
   var leaderEvents = [];
@@ -50,6 +53,7 @@
     state.calloutText = d.callout;
     state.manualIds = [];
     state.pick = 'top';
+    state.hoverId = null;
     $('#calloutText').value = d.callout;
 
     var p = cache[mode] ? Promise.resolve(cache[mode]) : PopData.load(mode).then(function (x) {
@@ -149,6 +153,7 @@
     if (!ds) return;
     renderChart();
     renderRanking();
+    renderMap();
     renderSlide();
     renderLabels();
   }
@@ -159,6 +164,104 @@
     c.ctx.fillStyle = '#fff';
     c.ctx.fillRect(0, 0, c.w, c.h);
     chartGeom = PopChart.drawChart(c.ctx, { x: 0, y: 0, w: c.w, h: c.h }, chartSpec(false));
+  }
+
+  /* ---------- 世界地図 ---------- */
+
+  /** 地図に塗る値を国ごとに一度だけ計算する。 */
+  function mapSpec() {
+    var year = Math.round(state.currentYear);
+    var values = {}, hasNoData = false;
+
+    geo.countries.forEach(function (c) {
+      var v = ds.byId[c.id] ? ds.valueAt(c.id, year) : null;
+      if (v !== null && state.mapMode === 'ratio') {
+        var base = ds.valueAt(c.id, state.yearFrom);
+        v = base ? v / base : null;
+      }
+      if (v === null) hasNoData = true;
+      values[c.id] = v;
+    });
+
+    return {
+      geo: geo,
+      mapMode: state.mapMode,
+      values: values,
+      hasNoData: hasNoData,
+      highlightId: state.hoverId,
+      yearLabel: year + '年' + (ds.isFuture(year) ? '（推計）' : ''),
+      valueOf: function (id) { return values[id]; }
+    };
+  }
+
+  function mapSlideSpec() {
+    var spec = mapSpec();
+    var year = Math.round(state.currentYear);
+    spec.title = state.slideTitle || (state.mapMode === 'ratio'
+      ? state.yearFrom + '年から' + year + '年で、人口はどこが増えたか'
+      : year + '年の世界の人口分布');
+    spec.subtitle = state.slideSubtitle || (state.mapMode === 'ratio'
+      ? '色が濃い青ほど増加、赤は減少（' + state.yearFrom + '年＝1倍）'
+      : '国ごとの人口を色の濃さで表示');
+    spec.footnote = footnote();
+    return spec;
+  }
+
+  function renderMap() {
+    if (state.view !== 'map') return;
+    var usable = state.mode === 'world' && geo;
+    $('#mapNotice').hidden = usable;
+    if (!usable) { mapGeom = null; return; }
+
+    var c = sizeCanvas($('#map'));
+    if (!c) return;
+    c.ctx.fillStyle = '#fff';
+    c.ctx.fillRect(0, 0, c.w, c.h);
+    mapGeom = PopMap.drawMap(c.ctx, { x: 0, y: 0, w: c.w, h: c.h }, mapSpec());
+  }
+
+  function ensureGeo() {
+    if (geo || state.mode !== 'world') return;
+    PopData.loadGeo().then(function (g) {
+      geo = g;
+      renderMap();
+    }).catch(function (err) {
+      toast(err.message);
+      console.error(err);
+    });
+  }
+
+  function onMapMove(ev) {
+    if (!mapGeom) return;
+    var canvas = $('#map');
+    var rect = canvas.getBoundingClientRect();
+    var x = ev.clientX - rect.left, y = ev.clientY - rect.top;
+    var hitCountry = PopMap.countryAt(mapGeom, x, y);
+    var tip = $('#mapTooltip');
+
+    if (!hitCountry) {
+      tip.hidden = true;
+      if (state.hoverId) { state.hoverId = null; renderMap(); }
+      return;
+    }
+    if (state.hoverId !== hitCountry.id) { state.hoverId = hitCountry.id; renderMap(); }
+
+    var year = Math.round(state.currentYear);
+    var e = ds.byId[hitCountry.id];
+    var pop = e ? ds.valueAt(e.id, year) : null;
+    var rows = '<div class="tooltip__row">' + (e ? e.name : hitCountry.id) +
+      '<span class="tooltip__val">' + (pop === null ? 'データなし' : PopData.formatValue(pop, 'world', 'abs')) + '</span></div>';
+    if (state.mapMode === 'ratio' && e) {
+      var base = ds.valueAt(e.id, state.yearFrom);
+      rows += '<div class="tooltip__row">' + state.yearFrom + '年から' +
+        '<span class="tooltip__val">' + (base && pop !== null ? (pop / base).toFixed(2) + '倍' : '—') + '</span></div>';
+    }
+    tip.innerHTML = '<div class="tooltip__year">' + year + '年' +
+      (ds.isFuture(year) ? '（推計）' : '') + '</div>' + rows;
+    tip.hidden = false;
+    var tw = tip.offsetWidth;
+    tip.style.left = Math.min(Math.max(x, tw / 2 + 4), rect.width - tw / 2 - 4) + 'px';
+    tip.style.top = Math.max(y - 12, tip.offsetHeight + 6) + 'px';
   }
 
   /** スライド枠を、はみ出さない側の辺に合わせて16:9の実寸で置く。 */
@@ -216,7 +319,8 @@
       if (state.yearTo > ds.lastHistoricalYear && state.showFuture) {
         parts.push((ds.lastHistoricalYear + 1) + '年以降: 同 中位推計');
       }
-      return '出典: ' + parts.join('／') + '（Our World in Data 経由）。1949年以前は推計値。';
+      var note = state.yearFrom < 1950 ? '。1949年以前は推計値。' : '。';
+      return '出典: ' + parts.join('／') + '（Our World in Data 経由）' + note;
     }
     parts.push('1920〜2020年: 総務省統計局「国勢調査」');
     if (state.yearTo > 2020 && state.showFuture) {
@@ -228,9 +332,10 @@
   function renderLabels() {
     var y = Math.round(state.currentYear);
     var suffix = ds.isFuture(y) ? '年（推計）' : '年';
-    $('#timeLabel').textContent = y + suffix;
-    $('#timeLabel2').textContent = y + suffix;
+    $$('.js-timelabel').forEach(function (el) { el.textContent = y + suffix; });
     $('#rankYear').textContent = y + suffix + 'の順位';
+    $('#mapTitle').textContent = state.mapMode === 'ratio'
+      ? '世界地図で見る人口の増減' : '世界地図で見る人口';
     $('#chartTitle').textContent = (state.mode === 'world' ? '世界' : '日本') + 'の人口の推移';
     $('#dataStamp').textContent = 'データ更新: ' + ds.meta.builtAt + '　実績 ' + ds.startYear + '〜' + ds.lastHistoricalYear + '年／推計 〜' + ds.endYear + '年';
   }
@@ -408,6 +513,12 @@
       : state.metric === 'share'
         ? (state.mode === 'world' ? '世界全体を100%としたときの割合です。' : '全国を100%としたときの割合です。')
         : '人口の実数をそのまま表示します。';
+    $('#mapModeNote').textContent = state.mapMode === 'ratio'
+      ? '期間の開始年（' + state.yearFrom + '年）を1倍として、そこから何倍になったかを塗り分けます。青が増加、赤が減少です。'
+      : 'その年の人口が多い国ほど濃い青で塗ります。';
+    $('#pptxNote').textContent = state.mode === 'world'
+      ? 'PowerPoint は「表紙・グラフ・世界地図・ランキング・出典」の5枚で出力されます。'
+      : 'PowerPoint は「表紙・グラフ・ランキング・出典」の4枚で出力されます。';
     syncVisibility();
     syncTimeline();
   }
@@ -423,7 +534,7 @@
   }
 
   function syncTimeline() {
-    [$('#timeline'), $('#timeline2')].forEach(function (r) {
+    $$('.js-timeline').forEach(function (r) {
       r.min = state.yearFrom;
       r.max = state.yearTo;
       r.value = Math.round(state.currentYear);
@@ -439,7 +550,7 @@
   function play() {
     if (state.currentYear >= state.yearTo) state.currentYear = state.yearFrom;
     state.playing = true;
-    $('#playBtn').textContent = '❚❚ 停止';
+    $$('.js-play').forEach(function (b) { b.textContent = '❚❚ 停止'; });
     var span = state.yearTo - state.yearFrom;
     var perMs = span / 14000;      // 全期間を約14秒で流す
     var last = performance.now();
@@ -458,7 +569,7 @@
   function stop() {
     state.playing = false;
     if (rafId) cancelAnimationFrame(rafId);
-    $('#playBtn').textContent = '▶ 再生';
+    $$('.js-play').forEach(function (b) { b.textContent = '▶ 再生'; });
   }
 
   function checkEvent() {
@@ -520,6 +631,7 @@
     $$('.tab').forEach(function (t) { t.classList.toggle('is-active', t.dataset.view === view); });
     $$('.view').forEach(function (v) { v.classList.toggle('is-active', v.dataset.view === view); });
     syncVisibility();
+    if (view === 'map') ensureGeo();
     requestAnimationFrame(render);
   }
 
@@ -583,14 +695,14 @@
     $('#slideTitle').addEventListener('input', function () { state.slideTitle = this.value; renderSlide(); });
     $('#slideSubtitle').addEventListener('input', function () { state.slideSubtitle = this.value; renderSlide(); });
 
-    [$('#timeline'), $('#timeline2')].forEach(function (r) {
+    $$('.js-timeline').forEach(function (r) {
       r.addEventListener('input', function () {
         stop();
         state.currentYear = parseInt(this.value, 10);
         syncTimeline(); render();
       });
     });
-    $('#playBtn').addEventListener('click', togglePlay);
+    $$('.js-play').forEach(function (b) { b.addEventListener('click', togglePlay); });
 
     $('#entitySearch').addEventListener('input', function () {
       var q = this.value.trim().toLowerCase();
@@ -606,12 +718,31 @@
     chart.addEventListener('mousemove', onChartMove);
     chart.addEventListener('mouseleave', function () { $('#tooltip').hidden = true; });
 
+    var map = $('#map');
+    map.addEventListener('mousemove', onMapMove);
+    map.addEventListener('mouseleave', function () {
+      $('#mapTooltip').hidden = true;
+      if (state.hoverId) { state.hoverId = null; renderMap(); }
+    });
+    $('#dlMapPng').addEventListener('click', function () {
+      if (!geo || state.mode !== 'world') { toast('世界地図は「世界（国・地域）」のときに使えます'); return; }
+      PopExport.mapPng(mapSlideSpec(), fileBase() + '-map');
+    });
+
     $('#dlPng').addEventListener('click', function () { PopExport.png(slideSpec(), fileBase()); });
     $('#dlPptx').addEventListener('click', function () {
-      PopExport.pptx(slideSpec(), rankingRows(), fileBase(), {
-        mode: state.mode, metric: state.metric,
-        year: Math.round(state.currentYear), isFuture: ds.isFuture(Math.round(state.currentYear)),
-        sources: ds.meta.sources
+      // 世界モードでは地図のスライドも入れるので、地図データを先に用意する
+      var ready = state.mode === 'world' && !geo
+        ? PopData.loadGeo().then(function (g) { geo = g; }).catch(function () { geo = null; })
+        : Promise.resolve();
+
+      ready.then(function () {
+        PopExport.pptx(slideSpec(), rankingRows(), fileBase(), {
+          mode: state.mode, metric: state.metric,
+          year: Math.round(state.currentYear), isFuture: ds.isFuture(Math.round(state.currentYear)),
+          sources: ds.meta.sources,
+          mapSpec: state.mode === 'world' && geo ? mapSlideSpec() : null
+        });
       });
     });
 

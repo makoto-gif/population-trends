@@ -170,6 +170,22 @@
     return '人口（' + unitFor(mode).axisSuffix + '）';
   }
 
+  var geoPromise = null;
+
+  /** 世界地図のポリゴン。一度だけ読み込んで使い回す。 */
+  function loadGeo() {
+    if (!geoPromise) {
+      geoPromise = fetch('data/world-geo.json').then(function (r) {
+        if (!r.ok) throw new Error('地図データを読み込めませんでした（' + r.status + '）');
+        return r.json();
+      }).catch(function (err) {
+        geoPromise = null;          // 次に開いたときに再試行できるようにする
+        throw err;
+      });
+    }
+    return geoPromise;
+  }
+
   function load(mode) {
     var file = mode === 'world' ? 'data/world.json' : 'data/japan.json';
     return fetch(file).then(function (r) {
@@ -180,6 +196,7 @@
 
   global.PopData = {
     load: load,
+    loadGeo: loadGeo,
     SERIES_COLORS: SERIES_COLORS,
     MAX_SERIES: MAX_SERIES,
     NEUTRAL: NEUTRAL,

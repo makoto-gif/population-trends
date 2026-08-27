@@ -13,6 +13,16 @@
     return canvas;
   }
 
+  function renderMapCanvas(spec) {
+    var canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    var ctx = canvas.getContext('2d');
+    // ホバーの強調は書き出しには不要
+    var clean = Object.assign({}, spec, { highlightId: null });
+    PopMap.drawMapSlide(ctx, W, H, clean);
+    return canvas;
+  }
+
   function download(blobOrUrl, filename) {
     var url = typeof blobOrUrl === 'string' ? blobOrUrl : URL.createObjectURL(blobOrUrl);
     var a = document.createElement('a');
@@ -26,6 +36,13 @@
     canvas.toBlob(function (blob) {
       download(blob, base + '.png');
       if (global.popToast) global.popToast('PNG を保存しました');
+    }, 'image/png');
+  }
+
+  function mapPng(spec, base) {
+    renderMapCanvas(spec).toBlob(function (blob) {
+      download(blob, base + '.png');
+      if (global.popToast) global.popToast('地図の PNG を保存しました');
     }, 'image/png');
   }
 
@@ -66,7 +83,14 @@
     s2.background = { color: 'FFFFFF' };
     s2.addImage({ data: renderSlideCanvas(spec).toDataURL('image/png'), x: 0, y: 0, w: 10, h: 5.625 });
 
-    /* --- 3枚目: ランキング表 --- */
+    /* --- 世界モードのみ: 地図のスライド --- */
+    if (info.mapSpec) {
+      var sMap = pptx.addSlide();
+      sMap.background = { color: 'FFFFFF' };
+      sMap.addImage({ data: renderMapCanvas(info.mapSpec).toDataURL('image/png'), x: 0, y: 0, w: 10, h: 5.625 });
+    }
+
+    /* --- ランキング表 --- */
     var s3 = pptx.addSlide();
     s3.background = { color: 'FFFFFF' };
     s3.addText(info.year + '年' + (info.isFuture ? '（推計）' : '') + 'の人口ランキング', {
@@ -112,7 +136,7 @@
     pptx.writeFile({ fileName: base + '.pptx' }).then(function () {
       btn.disabled = false;
       btn.textContent = 'PowerPoint（.pptx）';
-      if (global.popToast) global.popToast('PowerPoint を保存しました（4枚）');
+      if (global.popToast) global.popToast('PowerPoint を保存しました（' + (info.mapSpec ? 5 : 4) + '枚）');
     }).catch(function (err) {
       btn.disabled = false;
       btn.textContent = 'PowerPoint（.pptx）';
@@ -121,5 +145,5 @@
     });
   }
 
-  global.PopExport = { png: png, pptx: pptx };
+  global.PopExport = { png: png, mapPng: mapPng, pptx: pptx };
 })(window);
